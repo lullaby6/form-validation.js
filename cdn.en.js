@@ -1,3 +1,15 @@
+function fvDataURLtoBlob(dataURL) {
+    var arr = dataURL.split(',');
+    var mime = arr[0].match(/:(.*?);/)[1];
+    var bstr = atob(arr[1]);
+    var n = bstr.length;
+    var u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
 function fvIsValidFloat(str) {
     if (str === '') {
         return false;
@@ -50,6 +62,49 @@ function fvIsLowercase(str) {
     return /^[a-z]+$/.test(str);
 }
 
+function fvGetImageDimensions(inputElement, image) {
+    let height = image.height;
+    let width = image.width;
+
+    if (inputElement.hasAttribute('fv-image-to-width')) {
+        width = parseInt(inputElement.getAttribute('fv-image-to-width'));
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-height')) {
+        height = parseInt(inputElement.getAttribute('fv-image-to-height'));
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-min-width')) {
+        const minWidth = parseInt(inputElement.getAttribute('fv-image-to-min-width'));
+        if (width < minWidth) {
+            width = minWidth;
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-max-width')) {
+        const maxWidth = parseInt(inputElement.getAttribute('fv-image-to-max-width'));
+        if (width > maxWidth) {
+            width = maxWidth;
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-min-height')) {
+        const minHeight = parseInt(inputElement.getAttribute('fv-image-to-min-height'));
+        if (height < minHeight) {
+            height = minHeight;
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-max-height')) {
+        const maxHeight = parseInt(inputElement.getAttribute('fv-image-to-max-height'));
+        if (height > maxHeight) {
+            height = maxHeight;
+        }
+    }
+
+    return { width, height };
+}
+
 let fvFeedbacks = (name, value) => ({
     'fv-required': `${name} is required`,
     'fv-min-length': `${name} must be at least ${value} characters long`,
@@ -79,6 +134,8 @@ let fvFeedbacks = (name, value) => ({
     'fv-video': `${name} must be an video`,
     'fv-min-size': `${name} must be at least ${value} bytes`,
     'fv-max-size': `${name} must be less than ${value} bytes`,
+    'fv-file-include': `${name} must include "${value}"`,
+    'fv-file-exclude': `${name} must not include "${value}"`,
     'fv-file-start': `${name} must start with "${value}"`,
     'fv-file-no-start': `${name} must not start with "${value}"`,
     'fv-file-end': `${name} must be "${value}"`,
@@ -272,6 +329,26 @@ function fvGetInputFeedback(inputElement) {
         }
     }
 
+    if (inputElement.hasAttribute('fv-equal')) {
+        const formElement = inputElement.closest('form');
+        if (formElement) {
+
+            const targetInputElement = formElement.querySelector(inputElement.getAttribute('fv-equal'));
+            if (targetInputElement) {
+
+                const targetInputName = targetInputElement.getAttribute('fv-display') || targetInputElement.getAttribute('name') || targetInputElement.getAttribute('id') || 'input';
+
+                targetInputElement.addEventListener('input', () => {
+                    fvProcessInput(inputElement)
+                })
+
+                if (targetInputElement.value !== value) {
+                    return fvFeedbacks(name, targetInputName)['fv-equal']
+                }
+            }
+        }
+    }
+
     if (inputElement.hasAttribute('fv-image') && inputElement.files) {
         if (!inputElement.hasAttribute('accept')) {
             inputElement.setAttribute('accept', 'image/*')
@@ -324,6 +401,26 @@ function fvGetInputFeedback(inputElement) {
         for (const file of inputElement.files) {
             if (file.size > maxSize) {
                 return fvFeedbacks(name, maxSize)['fv-max-size']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-include') && inputElement.files) {
+        const include = inputElement.getAttribute('fv-file-include')
+
+        for (const file of inputElement.files) {
+            if (!file.name.includes(include)) {
+                return fvFeedbacks(name, include)['fv-file-include']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-exclude') && inputElement.files) {
+        const exclude = inputElement.getAttribute('fv-file-exclude')
+
+        for (const file of inputElement.files) {
+            if (file.name.includes(exclude)) {
+                return fvFeedbacks(name, exclude)['fv-file-exclude']
             }
         }
     }
@@ -513,21 +610,180 @@ function fvGetInputFeedback(inputElement) {
         }
     }
 
-    if (inputElement.hasAttribute('fv-equal')) {
-        const formElement = inputElement.closest('form');
-        if (formElement) {
+    if (inputElement.hasAttribute('fv-image-to-webp') && inputElement.files) {
+        for (let file of inputElement.files) {
+            if (file.type.startsWith('image/') && !file.name.endsWith('.webp')) {
+                const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, "")
 
-            const targetInputElement = formElement.querySelector(inputElement.getAttribute('fv-equal'));
-            if (targetInputElement) {
+                if (inputElement.fvImagesToWebp && inputElement.fvImagesToWebp.includes(fileNameWithoutExtension)) {
+                    continue
+                }
 
-                const targetInputName = targetInputElement.getAttribute('fv-display') || targetInputElement.getAttribute('name') || targetInputElement.getAttribute('id') || 'input';
+                if (!inputElement.fvImagesToWebp) {
+                    inputElement.fvImagesToWebp = []
+                }
 
-                targetInputElement.addEventListener('input', () => {
-                    fvProcessInput(inputElement)
-                })
+                inputElement.fvImagesToWebp.push(fileNameWithoutExtension);
 
-                if (targetInputElement.value !== value) {
-                    return fvFeedbacks(name, targetInputName)['fv-equal']
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        const {width, height} = fvGetImageDimensions(inputElement, image)
+
+                        const canvas = document.createElement('canvas')
+
+                        canvas.width = width
+                        canvas.height = height
+
+                        canvas.getContext('2d').drawImage(image, 0, 0, width, height);
+
+                        const dataURL = canvas.toDataURL('image/webp');
+
+                        const blob = fvDataURLtoBlob(dataURL);
+
+                        const newFile = new File([blob], `${fileNameWithoutExtension}.webp`, { type: 'image/webp' });
+
+                        const fileList = new DataTransfer();
+                        fileList.items.add(newFile);
+
+                        for (let existingFile of inputElement.files) {
+                            if (file != existingFile || file.name != existingFile.name) {
+                                fileList.items.add(existingFile);
+                            }
+                        }
+
+                        inputElement.value = ''
+                        inputElement.files = fileList.files
+
+                        inputElement.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-png') && inputElement.files) {
+        for (let file of inputElement.files) {
+            if (file.type.startsWith('image/') && !file.name.endsWith('.png')) {
+                const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, "")
+
+                if (inputElement.fvImagesToPng && inputElement.fvImagesToPng.includes(fileNameWithoutExtension)) {
+                    continue
+                }
+
+                if (!inputElement.fvImagesToPng) {
+                    inputElement.fvImagesToPng = []
+                }
+
+                inputElement.fvImagesToPng.push(fileNameWithoutExtension);
+
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        var height = this.height;
+                        var width = this.width;
+
+                        const canvas = document.createElement('canvas')
+
+                        canvas.width = width
+                        canvas.height = height
+
+                        canvas.getContext('2d').drawImage(image, 0, 0, width, height);
+
+                        const dataURL = canvas.toDataURL('image/png');
+
+                        const blob = fvDataURLtoBlob(dataURL);
+
+                        const newFile = new File([blob], `${fileNameWithoutExtension}.png`, { type: 'image/png' });
+
+                        const fileList = new DataTransfer();
+                        fileList.items.add(newFile);
+
+                        for (let existingFile of inputElement.files) {
+                            if (file != existingFile || file.name != existingFile.name) {
+                                fileList.items.add(existingFile);
+                            }
+                        }
+
+                        inputElement.value = ''
+                        inputElement.files = fileList.files
+
+                        inputElement.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-to-jpg') && inputElement.files) {
+        for (let file of inputElement.files) {
+            if (file.type.startsWith('image/') && !file.name.endsWith('.jpg')) {
+                const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, "")
+
+                if (inputElement.fvImagesToJpg && inputElement.fvImagesToJpg.includes(fileNameWithoutExtension)) {
+                    continue
+                }
+
+                if (!inputElement.fvImagesToJpg) {
+                    inputElement.fvImagesToJpg = []
+                }
+
+                inputElement.fvImagesToJpg.push(fileNameWithoutExtension);
+
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        var height = this.height;
+                        var width = this.width;
+
+                        const canvas = document.createElement('canvas')
+
+                        canvas.width = width
+                        canvas.height = height
+
+                        canvas.getContext('2d').drawImage(image, 0, 0, width, height);
+
+                        const dataURL = canvas.toDataURL('image/jpg');
+
+                        const blob = fvDataURLtoBlob(dataURL);
+
+                        const newFile = new File([blob], `${fileNameWithoutExtension}.jpg`, { type: 'image/jpg' });
+
+                        const fileList = new DataTransfer();
+                        fileList.items.add(newFile);
+
+                        for (let existingFile of inputElement.files) {
+                            if (file != existingFile || file.name != existingFile.name) {
+                                fileList.items.add(existingFile);
+                            }
+                        }
+
+                        inputElement.value = ''
+                        inputElement.files = fileList.files
+
+                        inputElement.dispatchEvent(new Event('change'));
+                    }
                 }
             }
         }

@@ -74,6 +74,22 @@ let fvFeedbacks = (name, value) => ({
     'fv-http-url': `${name} must be an http url`,
     'fv-ip': `${name} must be an ipv4`,
     'fv-equal': `${name} must be equal to "${value}"`,
+    'fv-image': `${name} must be an image`,
+    'fv-audio': `${name} must be an audio`,
+    'fv-video': `${name} must be an video`,
+    'fv-min-size': `${name} must be at least ${value} bytes`,
+    'fv-max-size': `${name} must be less than ${value} bytes`,
+    'fv-file-start': `${name} must start with "${value}"`,
+    'fv-file-no-start': `${name} must not start with "${value}"`,
+    'fv-file-end': `${name} must be "${value}"`,
+    'fv-file-no-end': `${name} must not be "${value}"`,
+    'fv-files': `${name} must be ${value} files`,
+    'fv-min-files': `${name} must be at least ${value} files`,
+    'fv-max-files': `${name} must be less than ${value} files`,
+    'fv-image-min-width': `${name} must be at least ${value}px`,
+    'fv-image-max-width': `${name} must be less than ${value}px`,
+    'fv-image-min-height': `${name} must be at least ${value}px`,
+    'fv-image-max-height': `${name} must be less than ${value}px`,
 })
 
 function fvGetInputFeedback(inputElement) {
@@ -256,6 +272,247 @@ function fvGetInputFeedback(inputElement) {
         }
     }
 
+    if (inputElement.hasAttribute('fv-image') && inputElement.files) {
+        if (!inputElement.hasAttribute('accept')) {
+            inputElement.setAttribute('accept', 'image/*')
+        }
+
+        for (const file of inputElement.files) {
+            if (!file.type.startsWith('image/')) {
+                return fvFeedbacks(name)['fv-image']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-audio') && inputElement.files) {
+        if (!inputElement.hasAttribute('accept')) {
+            inputElement.setAttribute('accept', 'audio/*')
+        }
+
+        for (const file of inputElement.files) {
+            if (!file.type.startsWith('audio/')) {
+                return fvFeedbacks(name)['fv-audio']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-video') && inputElement.files) {
+        if (!inputElement.hasAttribute('accept')) {
+            inputElement.setAttribute('accept', 'video/*')
+        }
+
+        for (const file of inputElement.files) {
+            if (!file.type.startsWith('video/')) {
+                return fvFeedbacks(name)['fv-video']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-min-size') && inputElement.files) {
+        const minSize = parseFloat(inputElement.getAttribute('fv-min-size'))
+
+        for (const file of inputElement.files) {
+            if (file.size < minSize) {
+                return fvFeedbacks(name, minSize)['fv-min-size']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-max-size') && inputElement.files) {
+        const maxSize = parseFloat(inputElement.getAttribute('fv-max-size'))
+
+        for (const file of inputElement.files) {
+            if (file.size > maxSize) {
+                return fvFeedbacks(name, maxSize)['fv-max-size']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-start') && inputElement.files) {
+        const startsWith = inputElement.getAttribute('fv-file-start')
+
+        for (const file of inputElement.files) {
+            if (!file.name.startsWith(startsWith)) {
+                return fvFeedbacks(name, startsWith)['fv-file-start']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-no-start') && inputElement.files) {
+        const startsWith = inputElement.getAttribute('fv-file-no-start')
+
+        for (const file of inputElement.files) {
+            if (file.name.startsWith(startsWith)) {
+                return fvFeedbacks(name, startsWith)['fv-file-no-start']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-end') && inputElement.files) {
+        const endsWith = inputElement.getAttribute('fv-file-end')
+
+        for (const file of inputElement.files) {
+            if (!file.name.endsWith(endsWith)) {
+                return fvFeedbacks(name, endsWith)['fv-file-end']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-file-no-end') && inputElement.files) {
+        const endsWith = inputElement.getAttribute('fv-file-no-end')
+
+        for (const file of inputElement.files) {
+            if (file.name.endsWith(endsWith)) {
+                return fvFeedbacks(name, endsWith)['fv-file-no-end']
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-files') && inputElement.files) {
+        if (!inputElement.hasAttribute('multiple')) {
+            inputElement.setAttribute('multiple', '')
+        }
+
+        const files = inputElement.getAttribute('fv-files')
+
+        if (inputElement.files.length != files) {
+            return fvFeedbacks(name, files)['fv-files']
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-min-files') && inputElement.files) {
+        if (!inputElement.hasAttribute('multiple')) {
+            inputElement.setAttribute('multiple', '')
+        }
+
+        const minFiles = inputElement.getAttribute('fv-min-files')
+
+        if (inputElement.files.length < minFiles) {
+            return fvFeedbacks(name, minFiles)['fv-min-files']
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-max-files') && inputElement.files) {
+        if (!inputElement.hasAttribute('multiple')) {
+            inputElement.setAttribute('multiple', '')
+        }
+
+        const maxFiles = inputElement.getAttribute('fv-max-files')
+
+        if (inputElement.files.length > maxFiles) {
+            return fvFeedbacks(name, maxFiles)['fv-max-files']
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-min-width') && inputElement.files) {
+        const minWidth = parseFloat(inputElement.getAttribute('fv-image-min-width'))
+
+        for (const file of inputElement.files) {
+            if (file.type.startsWith('image/')) {
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        // var height = this.height;
+                        var width = this.width;
+
+                        if (width < minWidth) {
+                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, minWidth)['fv-image-min-width'])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-max-width') && inputElement.files) {
+        const maxWidth = parseFloat(inputElement.getAttribute('fv-image-max-width'))
+
+        for (const file of inputElement.files) {
+            if (file.type.startsWith('image/')) {
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        // var height = this.height;
+                        var width = this.width;
+
+                        if (width > maxWidth) {
+                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, maxWidth)['fv-image-max-width'])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-min-height') && inputElement.files) {
+        const minHeight = parseFloat(inputElement.getAttribute('fv-image-min-height'))
+
+        for (const file of inputElement.files) {
+            if (file.type.startsWith('image/')) {
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        var height = this.height;
+                        // var width = this.width;
+
+                        if (height < minHeight) {
+                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, minHeight)['fv-image-min-height'])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-max-height') && inputElement.files) {
+        const maxHeight = parseFloat(inputElement.getAttribute('fv-image-max-height'))
+
+        for (const file of inputElement.files) {
+            if (file.type.startsWith('image/')) {
+                var reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    var image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        var height = this.height;
+                        // var width = this.width;
+
+                        console.log(height, maxHeight);
+                        if (height > maxHeight) {
+                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, maxHeight)['fv-image-max-height'])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (inputElement.hasAttribute('fv-equal')) {
         const formElement = inputElement.closest('form');
         if (formElement) {
@@ -279,6 +536,36 @@ function fvGetInputFeedback(inputElement) {
     return null
 }
 
+function fvPrcessInputByFeedback(inputElement, inputFeedback) {
+    inputElement.setAttribute('fv-used', '')
+
+    inputElement.fvInputLoaded = true
+
+    const name = inputElement.getAttribute('name')
+
+    let feedbackElement = null
+
+    if (name) {
+        const formElement = inputElement.closest('form')
+        if (formElement) feedbackElement = formElement.querySelector(`[fv-for="${name}"]`)
+        if (!feedbackElement) feedbackElement = inputElement.parentNode.querySelector(`[fv-for="${name}"]`)
+        if (!feedbackElement) feedbackElement = document.querySelector(`[fv-for="${name}"]`)
+    }
+
+    if (feedbackElement) {
+        if (inputElement.hasAttribute('fv-used')) feedbackElement.innerText = inputFeedback
+        feedbackElement.setAttribute('fv-for-feedback', inputFeedback ? 'true' : 'false')
+    }
+
+    inputElement.setAttribute('fv-valid', !inputFeedback ? 'true' : 'false')
+
+    if (inputFeedback) inputElement.setAttribute('fv-input-feedback', inputFeedback)
+    else inputElement.removeAttribute('fv-input-feedback')
+
+    const formElement = inputElement.closest('form')
+    if (formElement) fvProcessForm(formElement)
+}
+
 function fvProcessInput(inputElement) {
     inputElement.fvInputLoaded = true
 
@@ -289,7 +576,7 @@ function fvProcessInput(inputElement) {
     if (name) {
         const formElement = inputElement.closest('form')
         if (formElement) feedbackElement = formElement.querySelector(`[fv-for="${name}"]`)
-        if (!feedbackElement) feedbackElement = inputElement.panrentNode.querySelector(`[fv-for="${name}"]`)
+        if (!feedbackElement) feedbackElement = inputElement.parentNode.querySelector(`[fv-for="${name}"]`)
         if (!feedbackElement) feedbackElement = document.querySelector(`[fv-for="${name}"]`)
     }
 

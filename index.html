@@ -17,11 +17,12 @@
             border: 1px solid red;
         }
     </style>
-    <form fv-form action="" fv-disable-submit="true" fv-prevent-default="true">
-        <input type="text" name="text" fv-display="Texto" fv-required>
+    <form action="" fv-form fv-disable-submit="true" fv-prevent-default="true">
+        <!-- <input type="text" name="text" fv-display="Texto" fv-required>
         <p fv-for="text"></p>
         <input type="text" name="text2" fv-min-length="5">
-        <p fv-for="text2"></p>
+        <p fv-for="text2"></p> -->
+        <input type="file" name="file" id="" fv-image-max-height="3000">
         <button type="submit">Submit</button>
         <h1 fv-form-feedback></h1>
     </form>

@@ -1,13 +1,82 @@
 function fvDataURLtoBlob(dataURL) {
-    var arr = dataURL.split(',');
-    var mime = arr[0].match(/:(.*?);/)[1];
-    var bstr = atob(arr[1]);
-    var n = bstr.length;
-    var u8arr = new Uint8Array(n);
+    let arr = dataURL.split(',');
+    let mime = arr[0].match(/:(.*?);/)[1];
+    let bstr = atob(arr[1]);
+    let n = bstr.length;
+    let u8arr = new Uint8Array(n);
     while (n--) {
         u8arr[n] = bstr.charCodeAt(n);
     }
     return new Blob([u8arr], { type: mime });
+}
+
+const fvIsValidPasswordDefaultOptions = {
+    length: 8,
+    uppercase: true,
+    lowercase: true,
+    digits: true,
+    specialChars: true
+}
+
+function fvGetAspectRatio(width, height) {
+    function gcd(a, b) {
+        return b === 0 ? a : gcd(b, a % b);
+    }
+
+    const mcd = gcd(width, height);
+
+    const aspectRatioWidth = width / mcd;
+    const aspectRatioHeight = height / mcd;
+
+    const aspectRatio = aspectRatioWidth + ":" + aspectRatioHeight;
+
+    return aspectRatio
+}
+
+function fvIsValidPassword(password, options = {length: 8, uppercase: true, lowercase: true, digits: true, specialChars: true}) {
+    options = {
+        ...fvIsValidPasswordDefaultOptions,
+        ...options
+    }
+
+    if (options.lowercase && !/[a-z]/.test(password)) {
+        return {
+            valid: false,
+            message: "must contain at least one lowercase letter",
+        }
+    }
+
+    if (options.uppercase && !/[A-Z]/.test(password)) {
+        return {
+            valid: false,
+            message: "must contain at least one uppercase letter",
+        }
+    }
+
+    if (options.digits && !/\d/.test(password)) {
+        return {
+            valid: false,
+            message: "must contain at least one digit",
+        }
+    }
+
+    if (options.specialChars && !/[^A-Za-z0-9]/.test(password)) {
+        return {
+            valid: false,
+            message: "must contain at least one special character"
+        };
+    }
+
+    if (password.length < options.length) {
+        return {
+            valid: false,
+            message: `must be at least ${options.length} characters long`
+        }
+    }
+
+    return {
+        valid: true
+    }
 }
 
 function fvIsValidFloat(str) {
@@ -143,10 +212,11 @@ let fvFeedbacks = (name, value) => ({
     'fv-files': `${name} must be ${value} files`,
     'fv-min-files': `${name} must be at least ${value} files`,
     'fv-max-files': `${name} must be less than ${value} files`,
-    'fv-image-min-width': `${name} must be at least ${value}px`,
-    'fv-image-max-width': `${name} must be less than ${value}px`,
-    'fv-image-min-height': `${name} must be at least ${value}px`,
-    'fv-image-max-height': `${name} must be less than ${value}px`,
+    'fv-image-min-width': `${name} width must be at least ${value}px`,
+    'fv-image-max-width': `${name} width must be less than ${value}px`,
+    'fv-image-min-height': `${name} height must be at least ${value}px`,
+    'fv-image-max-height': `${name} htight must be less than ${value}px`,
+    'fv-image-aspect-ratio': `${name} must have aspect ratio ${value}`,
 })
 
 function fvGetInputFeedback(inputElement) {
@@ -194,6 +264,15 @@ function fvGetInputFeedback(inputElement) {
     if (inputElement.hasAttribute('fv-to-prevent')) {
         if (value.includes(inputElement.getAttribute('fv-to-prevent'))) {
             inputElement.value = value.replaceAll(inputElement.getAttribute('fv-to-prevent'), '')
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-to-prevents')) {
+        const prevents = inputElement.getAttribute('fv-to-prevents').split(',');
+        for (const prevent of prevents) {
+            if (value.includes(prevent)) {
+                inputElement.value = value.replaceAll(prevent, '')
+            }
         }
     }
 
@@ -308,6 +387,41 @@ function fvGetInputFeedback(inputElement) {
     if (inputElement.hasAttribute('fv-email')) {
         if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/.test(value)) {
             return fvFeedbacks(name)['fv-email']
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-password')) {
+        const options = {}
+
+        if (inputElement.hasAttribute('fv-password-length')) {
+            options.length = parseInt(inputElement.getAttribute('fv-password-length'))
+        }
+
+        if (inputElement.hasAttribute('fv-password-lowercase')) {
+            const lowercase = inputElement.getAttribute('fv-password-lowercase')
+            options.lowercase = lowercase == 'true' ? true : (lowercase == 'false' ? false : true)
+        }
+
+        if (inputElement.hasAttribute('fv-password-uppercase')) {
+            const uppercase = inputElement.getAttribute('fv-password-uppercase')
+            options.uppercase = uppercase == 'true' ? true : (uppercase == 'false' ? false : true)
+        }
+
+        if (inputElement.hasAttribute('fv-password-digits')) {
+            const digits = inputElement.getAttribute('fv-password-digits')
+            options.digits = digits == 'true' ? true : (digits == 'false' ? false : true)
+        }
+
+        if (inputElement.hasAttribute('fv-password-special-chars')) {
+            const specialChars = inputElement.getAttribute('fv-password-special-chars')
+            options.specialChars = specialChars == 'true' ? true : (specialChars == 'false' ? false : true)
+        }
+
+        const passwordValidation = fvIsValidPassword(value, options);
+
+        if (!passwordValidation.valid) {
+            const message = passwordValidation.message
+            return `${name} ${message}`
         }
     }
 
@@ -506,21 +620,20 @@ function fvGetInputFeedback(inputElement) {
 
         for (const file of inputElement.files) {
             if (file.type.startsWith('image/')) {
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        // var height = this.height;
-                        var width = this.width;
+                        const width = this.width;
 
                         if (width < minWidth) {
-                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, minWidth)['fv-image-min-width'])
+                            fvPrcessInputWithFeedback(inputElement, fvFeedbacks(name, minWidth)['fv-image-min-width'])
                         }
                     }
                 }
@@ -533,21 +646,20 @@ function fvGetInputFeedback(inputElement) {
 
         for (const file of inputElement.files) {
             if (file.type.startsWith('image/')) {
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        // var height = this.height;
-                        var width = this.width;
+                        const width = this.width;
 
                         if (width > maxWidth) {
-                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, maxWidth)['fv-image-max-width'])
+                            fvPrcessInputWithFeedback(inputElement, fvFeedbacks(name, maxWidth)['fv-image-max-width'])
                         }
                     }
                 }
@@ -560,21 +672,20 @@ function fvGetInputFeedback(inputElement) {
 
         for (const file of inputElement.files) {
             if (file.type.startsWith('image/')) {
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        var height = this.height;
-                        // var width = this.width;
+                        const height = this.height;
 
                         if (height < minHeight) {
-                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, minHeight)['fv-image-min-height'])
+                            fvPrcessInputWithFeedback(inputElement, fvFeedbacks(name, minHeight)['fv-image-min-height'])
                         }
                     }
                 }
@@ -587,22 +698,49 @@ function fvGetInputFeedback(inputElement) {
 
         for (const file of inputElement.files) {
             if (file.type.startsWith('image/')) {
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        var height = this.height;
-                        // var width = this.width;
+                        const height = this.height;
 
-                        console.log(height, maxHeight);
                         if (height > maxHeight) {
-                            fvPrcessInputByFeedback(inputElement, fvFeedbacks(name, maxHeight)['fv-image-max-height'])
+                            fvPrcessInputWithFeedback(inputElement, fvFeedbacks(name, maxHeight)['fv-image-max-height'])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (inputElement.hasAttribute('fv-image-aspect-ratio') && inputElement.files) {
+        const aspectRatio = inputElement.getAttribute('fv-image-aspect-ratio')
+
+        for (const file of inputElement.files) {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+
+                reader.readAsDataURL(file);
+
+                reader.onload = function (e) {
+                    const image = new Image();
+
+                    image.src = e.target.result;
+
+                    image.onload = function () {
+                        const width = this.width;
+                        const height = this.height;
+
+                        const imageAspectRatio = fvGetAspectRatio(width, height);
+
+                        if (imageAspectRatio != aspectRatio) {
+                            fvPrcessInputWithFeedback(inputElement, fvFeedbacks(name, aspectRatio)['fv-image-aspect-ratio'])
                         }
                     }
                 }
@@ -625,12 +763,12 @@ function fvGetInputFeedback(inputElement) {
 
                 inputElement.fvImagesToWebp.push(fileNameWithoutExtension);
 
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
@@ -684,18 +822,17 @@ function fvGetInputFeedback(inputElement) {
 
                 inputElement.fvImagesToPng.push(fileNameWithoutExtension);
 
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        var height = this.height;
-                        var width = this.width;
+                        const {width, height} = fvGetImageDimensions(inputElement, image)
 
                         const canvas = document.createElement('canvas')
 
@@ -744,18 +881,17 @@ function fvGetInputFeedback(inputElement) {
 
                 inputElement.fvImagesToJpg.push(fileNameWithoutExtension);
 
-                var reader = new FileReader();
+                const reader = new FileReader();
 
                 reader.readAsDataURL(file);
 
                 reader.onload = function (e) {
-                    var image = new Image();
+                    const image = new Image();
 
                     image.src = e.target.result;
 
                     image.onload = function () {
-                        var height = this.height;
-                        var width = this.width;
+                        const {width, height} = fvGetImageDimensions(inputElement, image)
 
                         const canvas = document.createElement('canvas')
 
@@ -792,37 +928,16 @@ function fvGetInputFeedback(inputElement) {
     return null
 }
 
-function fvPrcessInputByFeedback(inputElement, inputFeedback) {
+function fvPrcessInputWithFeedback(inputElement, inputFeedback) {
     inputElement.setAttribute('fv-used', '')
 
-    inputElement.fvInputLoaded = true
-
-    const name = inputElement.getAttribute('name')
-
-    let feedbackElement = null
-
-    if (name) {
-        const formElement = inputElement.closest('form')
-        if (formElement) feedbackElement = formElement.querySelector(`[fv-for="${name}"]`)
-        if (!feedbackElement) feedbackElement = inputElement.parentNode.querySelector(`[fv-for="${name}"]`)
-        if (!feedbackElement) feedbackElement = document.querySelector(`[fv-for="${name}"]`)
-    }
-
-    if (feedbackElement) {
-        if (inputElement.hasAttribute('fv-used')) feedbackElement.innerText = inputFeedback
-        feedbackElement.setAttribute('fv-for-feedback', inputFeedback ? 'true' : 'false')
-    }
-
-    inputElement.setAttribute('fv-valid', !inputFeedback ? 'true' : 'false')
-
-    if (inputFeedback) inputElement.setAttribute('fv-input-feedback', inputFeedback)
-    else inputElement.removeAttribute('fv-input-feedback')
+    fvProcessInput(inputElement, inputFeedback)
 
     const formElement = inputElement.closest('form')
     if (formElement) fvProcessForm(formElement)
 }
 
-function fvProcessInput(inputElement) {
+function fvProcessInput(inputElement, inputFeedback = null) {
     inputElement.fvInputLoaded = true
 
     const name = inputElement.getAttribute('name')
@@ -836,7 +951,9 @@ function fvProcessInput(inputElement) {
         if (!feedbackElement) feedbackElement = document.querySelector(`[fv-for="${name}"]`)
     }
 
-    const inputFeedback = fvGetInputFeedback(inputElement)
+    if (!inputFeedback) {
+        inputFeedback = fvGetInputFeedback(inputElement)
+    }
 
     if (feedbackElement) {
         if (inputElement.hasAttribute('fv-used')) feedbackElement.innerText = inputFeedback
